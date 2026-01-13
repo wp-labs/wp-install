@@ -134,5 +134,5 @@ fi
 
 printf '[warp-parse] installed binaries:%s\n' "$INSTALLED"
 printf '[warp-parse] location: %s\n' "$INSTALL_DIR"
-printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":\\$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
+printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
 printf 'Optional env vars:\n  WARP_PARSE_VERSION=v0.13.0\n  WARP_PARSE_INSTALL_DIR=/usr/local/bin\n  WARP_PARSE_MANIFEST_URL=https://example.com/custom-manifest.json\n'
