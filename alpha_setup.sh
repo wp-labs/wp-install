@@ -4,7 +4,7 @@ set -euo pipefail
 REPO="wp-labs/warp-parse"
 INSTALL_DIR="${WARP_PARSE_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WARP_PARSE_VERSION:-latest}"
-MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/main/dist/install-manifest.json}"
+MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/alpha/dist/install-manifest-alpha.json}"
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -49,9 +49,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf '[warp-parse] fetching manifest %s\n' "$MANIFEST_URL"
+printf '[warp-parse:alpha] fetching manifest %s\n' "$MANIFEST_URL"
 if ! curl -fsSL "$MANIFEST_URL" -o "$MANIFEST_FILE"; then
-    echo "[warp-parse] failed to download manifest" >&2
+    echo "[warp-parse:alpha] failed to download manifest" >&2
     exit 1
 fi
 
@@ -102,15 +102,15 @@ TAG=$(printf '%s' "$PY_OUT" | sed -n '1p')
 ASSET=$(printf '%s' "$PY_OUT" | sed -n '2p')
 
 if [ -z "$TAG" ] || [ -z "$ASSET" ]; then
-    echo "[warp-parse] failed to resolve download artifact" >&2
+    echo "[warp-parse:alpha] failed to resolve download artifact" >&2
     exit 1
 fi
 
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
 ARCHIVE_PATH="$TMP_DIR/$ASSET"
-printf '[warp-parse] downloading %s\n' "$DOWNLOAD_URL"
+printf '[warp-parse:alpha] downloading %s\n' "$DOWNLOAD_URL"
 if ! curl -fL "$DOWNLOAD_URL" -o "$ARCHIVE_PATH"; then
-    echo "[warp-parse] download failed" >&2
+    echo "[warp-parse:alpha] download failed" >&2
     exit 1
 fi
 
@@ -128,11 +128,10 @@ for bin in $BINARIES; do
 done
 
 if [ -z "$INSTALLED" ]; then
-    echo "[warp-parse] no binaries were installed (archive layout unexpected)" >&2
+    echo "[warp-parse:alpha] no binaries were installed (archive layout unexpected)" >&2
     exit 1
 fi
 
-printf '[warp-parse] installed binaries:%s\n' "$INSTALLED"
-printf '[warp-parse] location: %s\n' "$INSTALL_DIR"
+printf '[warp-parse:alpha] installed binaries:%s\n' "$INSTALLED"
+printf '[warp-parse:alpha] location: %s\n' "$INSTALL_DIR"
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WARP_PARSE_VERSION=v0.13.0\n  WARP_PARSE_INSTALL_DIR=/usr/local/bin\n  WARP_PARSE_MANIFEST_URL=https://example.com/custom-manifest.json\n'
