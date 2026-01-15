@@ -2,9 +2,48 @@
 set -euo pipefail
 
 REPO="wp-labs/warp-parse"
-MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/main/dist/install-manifest.json}"
 INSTALL_DIR="${WARP_PARSE_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WARP_PARSE_VERSION:-latest}"
+CHANNEL=""
+
+# Parse command line arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --alpha)
+            if [ -n "$CHANNEL" ]; then
+                echo "[warp-parse] cannot use --alpha and --beta together" >&2
+                exit 1
+            fi
+            CHANNEL="alpha"
+            shift
+            ;;
+        --beta)
+            if [ -n "$CHANNEL" ]; then
+                echo "[warp-parse] cannot use --alpha and --beta together" >&2
+                exit 1
+            fi
+            CHANNEL="beta"
+            shift
+            ;;
+        *)
+            echo "[warp-parse] unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Set manifest URL based on channel
+case "$CHANNEL" in
+    alpha)
+        MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/alpha/dist/install-manifest-alpha.json}"
+        ;;
+    beta)
+        MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/beta/dist/install-manifest-beta.json}"
+        ;;
+    *)
+        MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/main/dist/install-manifest.json}"
+        ;;
+esac
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -135,4 +174,5 @@ fi
 printf '[warp-parse] installed binaries:%s\n' "$INSTALLED"
 printf '[warp-parse] location: %s\n' "$INSTALL_DIR"
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
+printf 'Usage: setup.sh [--alpha | --beta]\n'
 printf 'Optional env vars:\n  WARP_PARSE_VERSION=v0.13.0\n  WARP_PARSE_INSTALL_DIR=/usr/local/bin\n  WARP_PARSE_MANIFEST_URL=https://example.com/custom-manifest.json\n'
