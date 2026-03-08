@@ -1,10 +1,9 @@
 #!/usr/bin/env sh
 set -euo pipefail
 
-REPO="wp-labs/warp-parse"
 INSTALL_DIR="${WARP_PARSE_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WARP_PARSE_VERSION:-latest}"
-MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/alpha/dist/install-manifest-alpha.json}"
+MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates/alpha/manifest.json}"
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -21,6 +20,20 @@ need_cmd install
 need_cmd find
 need_cmd python3
 need_cmd sed
+
+sha256_check() {
+    expected="$1"
+    file="$2"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s  %s\n' "$expected" "$file" | sha256sum -c - >/dev/null
+    elif command -v shasum >/dev/null 2>&1; then
+        printf '%s  %s\n' "$expected" "$file" | shasum -a 256 -c - >/dev/null
+    else
+        echo "[warp-parse:alpha] missing required command: sha256sum or shasum" >&2
+        exit 1
+    fi
+}
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$OS" in
@@ -67,50 +80,60 @@ manifest_path = sys.argv[4]
 with open(manifest_path, "r", encoding="utf-8") as fh:
     data = json.load(fh)
 
-releases = data.get("releases", [])
-if not releases:
-    sys.exit("manifest contains no releases")
+version = data.get("version", "")
+if not version:
+    sys.exit("manifest missing version")
 
 def normalize(ver: str) -> str:
     return ver if ver.startswith("v") else f"v{ver}"
 
-selected = None
-if requested == "latest":
-    selected = releases[0]
-else:
-    needle = normalize(requested)
-    for rel in releases:
-        ver = rel.get("version", "")
-        if ver == needle or ver.lstrip("v") == requested.lstrip("v"):
-            selected = rel
-            break
+resolved = normalize(version)
+if requested != "latest" and normalize(requested) != resolved:
+    sys.exit(f"version '{requested}' not found in manifest (current: {resolved})")
 
-if selected is None:
-    sys.exit(f"version '{requested}' not found in manifest")
+target_map = {
+    ("darwin", "arm64"): "aarch64-apple-darwin",
+    ("darwin", "x86_64"): "x86_64-apple-darwin",
+    ("linux", "arm64"): "aarch64-unknown-linux-gnu",
+    ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
+}
+target = target_map.get((os_key, arch_key))
+if not target:
+    sys.exit(f"unsupported target combination: {os_key}-{arch_key}")
 
-key = f"{os_key}-{arch_key}"
-asset = selected.get("artifacts", {}).get(key)
-if not asset:
-    sys.exit(f"no artifact entry for {key}")
+asset = data.get("assets", {}).get(target, {})
+url = asset.get("url", "")
+if not url:
+    sys.exit(f"no asset url entry for {target}")
+sha256 = asset.get("sha256", "")
+if not sha256:
+    sys.exit(f"no asset sha256 entry for {target}")
 
-print(selected.get("version", ""))
-print(asset)
+print(resolved)
+print(url)
+print(sha256)
 PY
 )
 
 TAG=$(printf '%s' "$PY_OUT" | sed -n '1p')
-ASSET=$(printf '%s' "$PY_OUT" | sed -n '2p')
+DOWNLOAD_URL=$(printf '%s' "$PY_OUT" | sed -n '2p')
+EXPECTED_SHA256=$(printf '%s' "$PY_OUT" | sed -n '3p')
 
-if [ -z "$TAG" ] || [ -z "$ASSET" ]; then
+if [ -z "$TAG" ] || [ -z "$DOWNLOAD_URL" ] || [ -z "$EXPECTED_SHA256" ]; then
     echo "[warp-parse:alpha] failed to resolve download artifact" >&2
     exit 1
 fi
 
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-ARCHIVE_PATH="$TMP_DIR/$ASSET"
+ASSET_NAME="${DOWNLOAD_URL##*/}"
+ARCHIVE_PATH="$TMP_DIR/$ASSET_NAME"
 printf '[warp-parse:alpha] downloading %s\n' "$DOWNLOAD_URL"
 if ! curl -fL "$DOWNLOAD_URL" -o "$ARCHIVE_PATH"; then
     echo "[warp-parse:alpha] download failed" >&2
+    exit 1
+fi
+printf '[warp-parse:alpha] verifying sha256 %s\n' "$ASSET_NAME"
+if ! sha256_check "$EXPECTED_SHA256" "$ARCHIVE_PATH"; then
+    echo "[warp-parse:alpha] sha256 verification failed for $ASSET_NAME" >&2
     exit 1
 fi
 
