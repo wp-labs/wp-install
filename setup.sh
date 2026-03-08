@@ -1,10 +1,9 @@
 #!/usr/bin/env sh
 set -euo pipefail
 
-REPO="wp-labs/warp-parse"
 INSTALL_DIR="${WARP_PARSE_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WARP_PARSE_VERSION:-latest}"
-MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/warp-parse/main/dist/install-manifest.json}"
+MANIFEST_URL="${WARP_PARSE_MANIFEST_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates/stable/manifest.json}"
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -67,47 +66,47 @@ manifest_path = sys.argv[4]
 with open(manifest_path, "r", encoding="utf-8") as fh:
     data = json.load(fh)
 
-releases = data.get("releases", [])
-if not releases:
-    sys.exit("manifest contains no releases")
+version = data.get("version", "")
+if not version:
+    sys.exit("manifest missing version")
 
 def normalize(ver: str) -> str:
     return ver if ver.startswith("v") else f"v{ver}"
 
-selected = None
-if requested == "latest":
-    selected = releases[0]
-else:
-    needle = normalize(requested)
-    for rel in releases:
-        ver = rel.get("version", "")
-        if ver == needle or ver.lstrip("v") == requested.lstrip("v"):
-            selected = rel
-            break
+resolved = normalize(version)
+if requested != "latest" and normalize(requested) != resolved:
+    sys.exit(f"version '{requested}' not found in manifest (current: {resolved})")
 
-if selected is None:
-    sys.exit(f"version '{requested}' not found in manifest")
+target_map = {
+    ("darwin", "arm64"): "aarch64-apple-darwin",
+    ("darwin", "x86_64"): "x86_64-apple-darwin",
+    ("linux", "arm64"): "aarch64-unknown-linux-gnu",
+    ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
+}
+target = target_map.get((os_key, arch_key))
+if not target:
+    sys.exit(f"unsupported target combination: {os_key}-{arch_key}")
 
-key = f"{os_key}-{arch_key}"
-asset = selected.get("artifacts", {}).get(key)
-if not asset:
-    sys.exit(f"no artifact entry for {key}")
+asset = data.get("assets", {}).get(target, {})
+url = asset.get("url", "")
+if not url:
+    sys.exit(f"no asset url entry for {target}")
 
-print(selected.get("version", ""))
-print(asset)
+print(resolved)
+print(url)
 PY
 )
 
 TAG=$(printf '%s' "$PY_OUT" | sed -n '1p')
-ASSET=$(printf '%s' "$PY_OUT" | sed -n '2p')
+DOWNLOAD_URL=$(printf '%s' "$PY_OUT" | sed -n '2p')
 
-if [ -z "$TAG" ] || [ -z "$ASSET" ]; then
+if [ -z "$TAG" ] || [ -z "$DOWNLOAD_URL" ]; then
     echo "[warp-parse] failed to resolve download artifact" >&2
     exit 1
 fi
 
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-ARCHIVE_PATH="$TMP_DIR/$ASSET"
+ASSET_NAME="${DOWNLOAD_URL##*/}"
+ARCHIVE_PATH="$TMP_DIR/$ASSET_NAME"
 printf '[warp-parse] downloading %s\n' "$DOWNLOAD_URL"
 if ! curl -fL "$DOWNLOAD_URL" -o "$ARCHIVE_PATH"; then
     echo "[warp-parse] download failed" >&2
