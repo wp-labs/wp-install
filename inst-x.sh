@@ -22,17 +22,19 @@ need_cmd install
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha]]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | wpl-check]
 
 Options:
   wparse    After installing wp-inst, run:
             wp-inst update --base-url https://raw.githubusercontent.com/wp-labs/wp-install/main/updates
   channel   Optional update channel for wparse. Default: stable
+  wpl-check After installing wp-inst, run:
+            wp-inst --github https://github.com/wp-labs/wpl-check --latest --yes
 EOF
 }
 
 case "$TARGET" in
-    ""|wparse) : ;;
+    ""|wparse|wpl-check) : ;;
     -h|--help)
         usage
         exit 0
@@ -44,14 +46,16 @@ case "$TARGET" in
         ;;
 esac
 
-case "$CHANNEL" in
-    stable|beta|alpha) : ;;
-    *)
-        echo "[wp-inst] unsupported channel: $CHANNEL" >&2
-        usage >&2
-        exit 1
-        ;;
-esac
+if [ "$TARGET" = "wparse" ]; then
+    case "$CHANNEL" in
+        stable|beta|alpha) : ;;
+        *)
+            echo "[wp-inst] unsupported channel: $CHANNEL" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+fi
 
 normalize_tag() {
     case "$1" in
@@ -149,6 +153,11 @@ printf '[wp-inst] version: %s\n' "$TAG"
 if [ "$TARGET" = "wparse" ]; then
     printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$UPDATES_BASE_URL" "$INSTALL_DIR"
     "$DEST" update --channel "$CHANNEL" --base-url "$UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+fi
+
+if [ "$TARGET" = "wpl-check" ]; then
+    printf '[wp-inst] running: %s --github %s --latest --yes\n' "$DEST" "https://github.com/wp-labs/wpl-check"
+    "$DEST" --github "https://github.com/wp-labs/wpl-check" --latest --yes
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
