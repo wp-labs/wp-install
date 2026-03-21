@@ -4,9 +4,11 @@ set -euo pipefail
 REPO="${WP_INST_REPO:-wp-labs/wp-update}"
 INSTALL_DIR="${WP_INST_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WP_INST_VERSION:-latest}"
-UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
+WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
+GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
+GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
 TARGET="${1:-}"
-CHANNEL="${2:-stable}"
+CHANNEL="${2:-}"
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -22,19 +24,24 @@ need_cmd install
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | wpl-check]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check]
 
 Options:
   wparse    After installing wp-inst, run:
             wp-inst update --base-url https://raw.githubusercontent.com/wp-labs/wp-install/main/updates
-  channel   Optional update channel for wparse. Default: stable
+  gx        After installing wp-inst, run:
+            wp-inst update --base-url https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx
+  gops      After installing wp-inst, run:
+            wp-inst update --base-url https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops
+  channel   Optional update channel.
+            default: stable
   wpl-check After installing wp-inst, run:
             wp-inst --github https://github.com/wp-labs/wpl-check --latest --yes
 EOF
 }
 
 case "$TARGET" in
-    ""|wparse|wpl-check) : ;;
+    ""|wparse|gx|gops|wpl-check) : ;;
     -h|--help)
         usage
         exit 0
@@ -46,7 +53,11 @@ case "$TARGET" in
         ;;
 esac
 
-if [ "$TARGET" = "wparse" ]; then
+if [ -z "$CHANNEL" ]; then
+    CHANNEL="stable"
+fi
+
+if [ "$TARGET" = "wparse" ] || [ "$TARGET" = "gx" ] || [ "$TARGET" = "gops" ]; then
     case "$CHANNEL" in
         stable|beta|alpha) : ;;
         *)
@@ -151,8 +162,18 @@ printf '[wp-inst] installed: %s\n' "$DEST"
 printf '[wp-inst] version: %s\n' "$TAG"
 
 if [ "$TARGET" = "wparse" ]; then
-    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$UPDATES_BASE_URL" "$INSTALL_DIR"
-    "$DEST" update --channel "$CHANNEL" --base-url "$UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$WPARSE_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" update --channel "$CHANNEL" --base-url "$WPARSE_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+fi
+
+if [ "$TARGET" = "gx" ]; then
+    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$GX_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" update --channel "$CHANNEL" --base-url "$GX_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+fi
+
+if [ "$TARGET" = "gops" ]; then
+    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$GOPS_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" update --channel "$CHANNEL" --base-url "$GOPS_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
 fi
 
 if [ "$TARGET" = "wpl-check" ]; then
@@ -161,4 +182,4 @@ if [ "$TARGET" = "wpl-check" ]; then
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n'
