@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
-set -euo pipefail
+set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO="${WP_INST_REPO:-wp-labs/wp-update}"
 INSTALL_DIR="${WP_INST_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WP_INST_VERSION:-latest}"
@@ -27,26 +28,27 @@ need_cmd install
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check | wp-skills]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
 
 Options:
   wparse    After installing wp-inst, run:
-            wp-inst update --base-url https://raw.githubusercontent.com/wp-labs/wp-install/main/updates
+            wp-inst install --source https://raw.githubusercontent.com/wp-labs/wp-install/main/updates
   gx        After installing wp-inst, run:
-            wp-inst update --base-url https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx
+            wp-inst install --source https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx
   gops      After installing wp-inst, run:
-            wp-inst update --base-url https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops
+            wp-inst install --source https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops
   channel   Optional update channel.
             default: stable
   wpl-check After installing wp-inst, run:
-            wp-inst --github https://github.com/wp-labs/wpl-check --latest --yes
+            wp-inst install --github https://github.com/wp-labs/wpl-check --yes
   wp-skills After installing wp-inst, run:
             wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warpparse-log-engineering
+  wplabs-lsp Install wplabs-lsp via lsp_setup.sh
 EOF
 }
 
 case "$TARGET" in
-    ""|wparse|gx|gops|wpl-check|wp-skills) : ;;
+    ""|wparse|gx|gops|wpl-check|wp-skills|wplabs-lsp) : ;;
     -h|--help)
         usage
         exit 0
@@ -158,6 +160,7 @@ printf '[wp-inst] resolved asset: %s\n' "$ASSET_NAME"
 mkdir -p "$INSTALL_DIR"
 INSTALLED_TAG=""
 INSTALLED_REPO=""
+INSTALLED_TARGET=""
 if [ -x "$DEST" ]; then
     VERSION_OUTPUT=$("$DEST" -V 2>/dev/null || true)
     case "$VERSION_OUTPUT" in
@@ -168,12 +171,13 @@ if [ -f "$META_FILE" ]; then
     while IFS='=' read -r KEY VALUE; do
         case "$KEY" in
             repo) INSTALLED_REPO="$VALUE" ;;
+            target) INSTALLED_TARGET="$VALUE" ;;
         esac
     done < "$META_FILE"
 fi
 
-if [ "$INSTALLED_TAG" = "$TAG" ] && [ "$INSTALLED_REPO" = "$REPO" ]; then
-    printf '[wp-inst] already installed: %s (%s from %s)\n' "$DEST" "$TAG" "$REPO"
+if [ "$INSTALLED_TAG" = "$TAG" ] && [ "$INSTALLED_REPO" = "$REPO" ] && [ "$INSTALLED_TARGET" = "$TARGET_TRIPLE" ]; then
+    printf '[wp-inst] already installed: %s (%s from %s for %s)\n' "$DEST" "$TAG" "$REPO" "$TARGET_TRIPLE"
 else
     printf '[wp-inst] downloading %s\n' "$DOWNLOAD_URL"
     if ! curl -fL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"; then
@@ -185,29 +189,30 @@ else
     {
         printf 'repo=%s\n' "$REPO"
         printf 'tag=%s\n' "$TAG"
+        printf 'target=%s\n' "$TARGET_TRIPLE"
     } > "$META_FILE"
     printf '[wp-inst] installed: %s\n' "$DEST"
     printf '[wp-inst] version: %s\n' "$TAG"
 fi
 
 if [ "$TARGET" = "wparse" ]; then
-    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$WPARSE_UPDATES_BASE_URL" "$INSTALL_DIR"
-    "$DEST" update --channel "$CHANNEL" --base-url "$WPARSE_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+    printf '[wp-inst] running: %s install --channel %s --source %s --dir %s --yes\n' "$DEST" "$CHANNEL" "$WPARSE_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" install --channel "$CHANNEL" --source "$WPARSE_UPDATES_BASE_URL" --dir "$INSTALL_DIR" --yes
 fi
 
 if [ "$TARGET" = "gx" ]; then
-    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$GX_UPDATES_BASE_URL" "$INSTALL_DIR"
-    "$DEST" update --channel "$CHANNEL" --base-url "$GX_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+    printf '[wp-inst] running: %s install --channel %s --source %s --dir %s --yes\n' "$DEST" "$CHANNEL" "$GX_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" install --channel "$CHANNEL" --source "$GX_UPDATES_BASE_URL" --dir "$INSTALL_DIR" --yes
 fi
 
 if [ "$TARGET" = "gops" ]; then
-    printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$GOPS_UPDATES_BASE_URL" "$INSTALL_DIR"
-    "$DEST" update --channel "$CHANNEL" --base-url "$GOPS_UPDATES_BASE_URL" --install-dir "$INSTALL_DIR" --yes
+    printf '[wp-inst] running: %s install --channel %s --source %s --dir %s --yes\n' "$DEST" "$CHANNEL" "$GOPS_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" install --channel "$CHANNEL" --source "$GOPS_UPDATES_BASE_URL" --dir "$INSTALL_DIR" --yes
 fi
 
 if [ "$TARGET" = "wpl-check" ]; then
-    printf '[wp-inst] running: %s --github %s --latest --yes\n' "$DEST" "https://github.com/wp-labs/wpl-check"
-    "$DEST" --github "https://github.com/wp-labs/wpl-check" --latest --yes
+    printf '[wp-inst] running: %s install --github %s --yes\n' "$DEST" "https://github.com/wp-labs/wpl-check"
+    "$DEST" install --github "https://github.com/wp-labs/wpl-check" --yes
 fi
 
 if [ "$TARGET" = "wp-skills" ]; then
@@ -219,6 +224,11 @@ if [ "$TARGET" = "wp-skills" ]; then
         printf '[wp-inst] running: %s --skill --github %s --path %s --tag %s\n' "$DEST" "https://github.com/${WP_SKILLS_REPO}" "$WP_SKILLS_PATH" "$WP_SKILLS_TAG"
         "$DEST" --skill --github "https://github.com/${WP_SKILLS_REPO}" --path "$WP_SKILLS_PATH" --tag "$WP_SKILLS_TAG"
     fi
+fi
+
+if [ "$TARGET" = "wplabs-lsp" ]; then
+    printf '[wp-inst] running: %s/lsp_setup.sh\n' "$SCRIPT_DIR"
+    "$SCRIPT_DIR/lsp_setup.sh"
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
