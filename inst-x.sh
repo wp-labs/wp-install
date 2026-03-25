@@ -4,6 +4,9 @@ set -euo pipefail
 REPO="${WP_INST_REPO:-wp-labs/wp-update}"
 INSTALL_DIR="${WP_INST_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WP_INST_VERSION:-latest}"
+WP_SKILLS_REPO="${WP_SKILLS_REPO:-wp-labs/wp-skills}"
+WP_SKILLS_PATH="${WP_SKILLS_PATH:-skills/warpparse-log-engineering}"
+WP_SKILLS_VERSION="${WP_SKILLS_VERSION:-latest}"
 WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
 GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
 GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
@@ -24,7 +27,7 @@ need_cmd install
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check | wp-skills]
 
 Options:
   wparse    After installing wp-inst, run:
@@ -37,11 +40,13 @@ Options:
             default: stable
   wpl-check After installing wp-inst, run:
             wp-inst --github https://github.com/wp-labs/wpl-check --latest --yes
+  wp-skills After installing wp-inst, run:
+            wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warpparse-log-engineering
 EOF
 }
 
 case "$TARGET" in
-    ""|wparse|gx|gops|wpl-check) : ;;
+    ""|wparse|gx|gops|wpl-check|wp-skills) : ;;
     -h|--help)
         usage
         exit 0
@@ -144,22 +149,46 @@ TAG=$(resolve_tag)
 TARGET_TRIPLE=$(resolve_target)
 ASSET_NAME="wp-inst-${TAG}-${TARGET_TRIPLE}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET_NAME}"
+DEST="$INSTALL_DIR/wp-inst"
+META_FILE="$INSTALL_DIR/.wp-inst-release-meta"
 
 printf '[wp-inst] resolved version: %s\n' "$TAG"
 printf '[wp-inst] resolved asset: %s\n' "$ASSET_NAME"
 
-printf '[wp-inst] downloading %s\n' "$DOWNLOAD_URL"
-if ! curl -fL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"; then
-    echo "[wp-inst] download failed" >&2
-    exit 1
+mkdir -p "$INSTALL_DIR"
+INSTALLED_TAG=""
+INSTALLED_REPO=""
+if [ -x "$DEST" ]; then
+    VERSION_OUTPUT=$("$DEST" -V 2>/dev/null || true)
+    case "$VERSION_OUTPUT" in
+        "wp-inst "*) INSTALLED_TAG=$(normalize_tag "${VERSION_OUTPUT#wp-inst }") ;;
+    esac
+fi
+if [ -f "$META_FILE" ]; then
+    while IFS='=' read -r KEY VALUE; do
+        case "$KEY" in
+            repo) INSTALLED_REPO="$VALUE" ;;
+        esac
+    done < "$META_FILE"
 fi
 
-mkdir -p "$INSTALL_DIR"
-DEST="$INSTALL_DIR/wp-inst"
-install -m 755 "$DOWNLOAD_FILE" "$DEST"
+if [ "$INSTALLED_TAG" = "$TAG" ] && [ "$INSTALLED_REPO" = "$REPO" ]; then
+    printf '[wp-inst] already installed: %s (%s from %s)\n' "$DEST" "$TAG" "$REPO"
+else
+    printf '[wp-inst] downloading %s\n' "$DOWNLOAD_URL"
+    if ! curl -fL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"; then
+        echo "[wp-inst] download failed" >&2
+        exit 1
+    fi
 
-printf '[wp-inst] installed: %s\n' "$DEST"
-printf '[wp-inst] version: %s\n' "$TAG"
+    install -m 755 "$DOWNLOAD_FILE" "$DEST"
+    {
+        printf 'repo=%s\n' "$REPO"
+        printf 'tag=%s\n' "$TAG"
+    } > "$META_FILE"
+    printf '[wp-inst] installed: %s\n' "$DEST"
+    printf '[wp-inst] version: %s\n' "$TAG"
+fi
 
 if [ "$TARGET" = "wparse" ]; then
     printf '[wp-inst] running: %s update --channel %s --base-url %s --install-dir %s --yes\n' "$DEST" "$CHANNEL" "$WPARSE_UPDATES_BASE_URL" "$INSTALL_DIR"
@@ -181,5 +210,16 @@ if [ "$TARGET" = "wpl-check" ]; then
     "$DEST" --github "https://github.com/wp-labs/wpl-check" --latest --yes
 fi
 
+if [ "$TARGET" = "wp-skills" ]; then
+    if [ "$WP_SKILLS_VERSION" = "latest" ]; then
+        printf '[wp-inst] running: %s --skill --github %s --path %s\n' "$DEST" "https://github.com/${WP_SKILLS_REPO}" "$WP_SKILLS_PATH"
+        "$DEST" --skill --github "https://github.com/${WP_SKILLS_REPO}" --path "$WP_SKILLS_PATH"
+    else
+        WP_SKILLS_TAG=$(normalize_tag "$WP_SKILLS_VERSION")
+        printf '[wp-inst] running: %s --skill --github %s --path %s --tag %s\n' "$DEST" "https://github.com/${WP_SKILLS_REPO}" "$WP_SKILLS_PATH" "$WP_SKILLS_TAG"
+        "$DEST" --skill --github "https://github.com/${WP_SKILLS_REPO}" --path "$WP_SKILLS_PATH" --tag "$WP_SKILLS_TAG"
+    fi
+fi
+
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_PATH=skills/warpparse-log-engineering\n  WP_SKILLS_VERSION=latest\n'
