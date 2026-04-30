@@ -14,4 +14,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run inst-x tests
-        run: sh wp-install/tests/inst-x.test.sh
+        run: sh tests/inst-x.test.sh
