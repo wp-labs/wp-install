@@ -11,6 +11,8 @@ WP_SKILLS_VERSION="${WP_SKILLS_VERSION:-latest}"
 WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
 GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
 GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
+MONITOR_DOCKER_BASE_URL="${MONITOR_DOCKER_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-monitor}"
+MONITOR_DOCKER_DIR="${MONITOR_DOCKER_DIR:-$HOME/.wp-monitor/docker}"
 TARGET="${1:-}"
 CHANNEL="${2:-}"
 
@@ -28,7 +30,7 @@ need_cmd install
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
 
 Options:
   wparse    After installing wp-inst, run:
@@ -44,11 +46,13 @@ Options:
   wp-skills After installing wp-inst, run:
             wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warpparse-log-engineering
   wplabs-lsp Install wplabs-lsp via lsp_setup.sh
+  monitor-docker
+             Install wp-monitor docker stack via start.sh
 EOF
 }
 
 case "$TARGET" in
-    ""|wparse|gx|gops|wpl-check|wp-skills|wplabs-lsp) : ;;
+    ""|wparse|gx|gops|wpl-check|wp-skills|wplabs-lsp|monitor-docker) : ;;
     -h|--help)
         usage
         exit 0
@@ -64,7 +68,7 @@ if [ -z "$CHANNEL" ]; then
     CHANNEL="stable"
 fi
 
-if [ "$TARGET" = "wparse" ] || [ "$TARGET" = "gx" ] || [ "$TARGET" = "gops" ]; then
+if [ "$TARGET" = "wparse" ] || [ "$TARGET" = "gx" ] || [ "$TARGET" = "gops" ] || [ "$TARGET" = "monitor-docker" ]; then
     case "$CHANNEL" in
         stable|beta|alpha) : ;;
         *)
@@ -141,58 +145,63 @@ case "$ARCH" in
         ;;
 esac
 
-DOWNLOAD_FILE=$(mktemp)
-cleanup() {
-    rm -f "$DOWNLOAD_FILE"
-}
-trap cleanup EXIT
+NEEDS_WP_INST=""
+case "$TARGET" in
+    ""|wparse|gx|gops|wpl-check|wp-skills) NEEDS_WP_INST="1" ;;
+esac
 
-TAG=$(resolve_tag)
-TARGET_TRIPLE=$(resolve_target)
-ASSET_NAME="wp-inst-${TAG}-${TARGET_TRIPLE}"
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET_NAME}"
-DEST="$INSTALL_DIR/wp-inst"
-META_FILE="$INSTALL_DIR/.wp-inst-release-meta"
+if [ -n "$NEEDS_WP_INST" ]; then
+    DOWNLOAD_FILE=$(mktemp)
+    cleanup() { rm -f "$DOWNLOAD_FILE"; }
+    trap cleanup EXIT
 
-printf '[wp-inst] resolved version: %s\n' "$TAG"
-printf '[wp-inst] resolved asset: %s\n' "$ASSET_NAME"
+    TAG=$(resolve_tag)
+    TARGET_TRIPLE=$(resolve_target)
+    ASSET_NAME="wp-inst-${TAG}-${TARGET_TRIPLE}"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET_NAME}"
+    DEST="$INSTALL_DIR/wp-inst"
+    META_FILE="$INSTALL_DIR/.wp-inst-release-meta"
 
-mkdir -p "$INSTALL_DIR"
-INSTALLED_TAG=""
-INSTALLED_REPO=""
-INSTALLED_TARGET=""
-if [ -x "$DEST" ]; then
-    VERSION_OUTPUT=$("$DEST" -V 2>/dev/null || true)
-    case "$VERSION_OUTPUT" in
-        "wp-inst "*) INSTALLED_TAG=$(normalize_tag "${VERSION_OUTPUT#wp-inst }") ;;
-    esac
-fi
-if [ -f "$META_FILE" ]; then
-    while IFS='=' read -r KEY VALUE; do
-        case "$KEY" in
-            repo) INSTALLED_REPO="$VALUE" ;;
-            target) INSTALLED_TARGET="$VALUE" ;;
+    printf '[wp-inst] resolved version: %s\n' "$TAG"
+    printf '[wp-inst] resolved asset: %s\n' "$ASSET_NAME"
+
+    mkdir -p "$INSTALL_DIR"
+    INSTALLED_TAG=""
+    INSTALLED_REPO=""
+    INSTALLED_TARGET=""
+    if [ -x "$DEST" ]; then
+        VERSION_OUTPUT=$("$DEST" -V 2>/dev/null || true)
+        case "$VERSION_OUTPUT" in
+            "wp-inst "*) INSTALLED_TAG=$(normalize_tag "${VERSION_OUTPUT#wp-inst }") ;;
         esac
-    done < "$META_FILE"
-fi
-
-if [ "$INSTALLED_TAG" = "$TAG" ] && [ "$INSTALLED_REPO" = "$REPO" ] && [ "$INSTALLED_TARGET" = "$TARGET_TRIPLE" ]; then
-    printf '[wp-inst] already installed: %s (%s from %s for %s)\n' "$DEST" "$TAG" "$REPO" "$TARGET_TRIPLE"
-else
-    printf '[wp-inst] downloading %s\n' "$DOWNLOAD_URL"
-    if ! curl -fL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"; then
-        echo "[wp-inst] download failed" >&2
-        exit 1
+    fi
+    if [ -f "$META_FILE" ]; then
+        while IFS='=' read -r KEY VALUE; do
+            case "$KEY" in
+                repo) INSTALLED_REPO="$VALUE" ;;
+                target) INSTALLED_TARGET="$VALUE" ;;
+            esac
+        done < "$META_FILE"
     fi
 
-    install -m 755 "$DOWNLOAD_FILE" "$DEST"
-    {
-        printf 'repo=%s\n' "$REPO"
-        printf 'tag=%s\n' "$TAG"
-        printf 'target=%s\n' "$TARGET_TRIPLE"
-    } > "$META_FILE"
-    printf '[wp-inst] installed: %s\n' "$DEST"
-    printf '[wp-inst] version: %s\n' "$TAG"
+    if [ "$INSTALLED_TAG" = "$TAG" ] && [ "$INSTALLED_REPO" = "$REPO" ] && [ "$INSTALLED_TARGET" = "$TARGET_TRIPLE" ]; then
+        printf '[wp-inst] already installed: %s (%s from %s for %s)\n' "$DEST" "$TAG" "$REPO" "$TARGET_TRIPLE"
+    else
+        printf '[wp-inst] downloading %s\n' "$DOWNLOAD_URL"
+        if ! curl -fL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"; then
+            echo "[wp-inst] download failed" >&2
+            exit 1
+        fi
+
+        install -m 755 "$DOWNLOAD_FILE" "$DEST"
+        {
+            printf 'repo=%s\n' "$REPO"
+            printf 'tag=%s\n' "$TAG"
+            printf 'target=%s\n' "$TARGET_TRIPLE"
+        } > "$META_FILE"
+        printf '[wp-inst] installed: %s\n' "$DEST"
+        printf '[wp-inst] version: %s\n' "$TAG"
+    fi
 fi
 
 if [ "$TARGET" = "wparse" ]; then
@@ -231,5 +240,42 @@ if [ "$TARGET" = "wplabs-lsp" ]; then
     "$SCRIPT_DIR/lsp_setup.sh"
 fi
 
+if [ "$TARGET" = "monitor-docker" ]; then
+    case "$CHANNEL" in
+        alpha) BRANCH="alpha" ;;
+        beta)  BRANCH="beta" ;;
+        stable) BRANCH="main" ;;
+    esac
+    COMPOSE_FILE="docker-compose-${CHANNEL}.yml"
+    START_SCRIPT_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/start.sh"
+    COMPOSE_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/${COMPOSE_FILE}"
+
+    printf '[wp-inst] monitor-docker 安装步骤 (%s channel, %s branch):\n' "$CHANNEL" "$BRANCH"
+    printf '  [1/4] 下载 start.sh\n'
+    printf '  [2/4] 下载 %s\n' "$COMPOSE_FILE"
+    printf '  [3/4] 下载 .env.example\n'
+    printf '  [4/4] 运行 start.sh\n'
+    printf '\n'
+
+    mkdir -p "$MONITOR_DOCKER_DIR"
+
+    printf '[wp-inst] [1/4] 下载 start.sh\n'
+    curl -fL "$START_SCRIPT_URL" -o "$MONITOR_DOCKER_DIR/start.sh"
+
+    printf '[wp-inst] [2/4] 下载 %s\n' "$COMPOSE_FILE"
+    curl -fL "$COMPOSE_URL" -o "$MONITOR_DOCKER_DIR/$COMPOSE_FILE"
+
+    printf '[wp-inst] [3/4] 下载 .env.example\n'
+    curl -fL "${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/.env.example" -o "$MONITOR_DOCKER_DIR/.env.example"
+
+    chmod +x "$MONITOR_DOCKER_DIR/start.sh"
+
+    printf '[wp-inst] [4/4] 运行: %s/start.sh\n' "$MONITOR_DOCKER_DIR"
+    (
+        cd "$MONITOR_DOCKER_DIR"
+        sh start.sh "$CHANNEL"
+    )
+fi
+
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_PATH=skills/warpparse-log-engineering\n  WP_SKILLS_VERSION=latest\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_PATH=skills/warpparse-log-engineering\n  WP_SKILLS_VERSION=latest\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n  MONITOR_DOCKER_DIR=$HOME/.wp-monitor/docker\n'

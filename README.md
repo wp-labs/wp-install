@@ -7,6 +7,7 @@
 - 安装 `wpl-check`
 - 安装 `wp-skills` 中的 skill
 - 安装 `wplabs-lsp`
+- 安装 `monitor-docker` 容器监控栈
 
 ## 快速开始
 
@@ -27,7 +28,7 @@ $HOME/bin/wp-inst
 ## 用法
 
 ```bash
-./inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
+./inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
 ```
 
 支持的目标：
@@ -39,8 +40,9 @@ $HOME/bin/wp-inst
 - `wpl-check`：安装 `wp-inst` 后，再安装 `wpl-check`
 - `wp-skills`：安装 `wp-inst` 后，再安装 `wp-skills` 中的一个 skill
 - `wplabs-lsp`：安装 `wp-inst` 后，再调用本仓库的 `lsp_setup.sh` 安装 `wplabs-lsp`
+- `monitor-docker`：从 `wp-labs/wp-monitor` 下载 `start.sh`、`docker-compose` 和 `.env.example`，然后运行 `start.sh` 启动容器监控栈
 
-对 `wparse` / `gx` / `gops`，第二个参数可选：
+对 `wparse` / `gx` / `gops` / `monitor-docker`，第二个参数可选：
 
 - `stable`
 - `beta`
@@ -92,6 +94,12 @@ $HOME/bin/wp-inst
 ./inst-x.sh wplabs-lsp
 ```
 
+安装 `monitor-docker` alpha：
+
+```bash
+./inst-x.sh monitor-docker alpha
+```
+
 ## `wp-skills`
 
 `wp-skills` 目标默认会执行：
@@ -128,6 +136,29 @@ wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warp
 - `WPLABS_LSP_VERSION`
 - `WPLABS_LSP_INSTALL_DIR`
 - `WPLABS_LSP_MANIFEST_URL`
+
+## `monitor-docker`
+
+`monitor-docker` 目标会从 `wp-labs/wp-monitor` 仓库下载以下文件到 `$HOME/.wp-monitor/docker/`：
+
+- `start.sh`
+- `docker-compose-{channel}.yml`
+- `.env.example`
+
+然后执行 `start.sh`（传入 channel 参数），启动容器监控栈。
+
+channel 到分支的映射：
+
+- `stable` → `main` 分支
+- `beta` → `beta` 分支
+- `alpha` → `alpha` 分支
+
+可用环境变量：
+
+- `MONITOR_DOCKER_BASE_URL`
+  默认：`https://raw.githubusercontent.com/wp-labs/wp-monitor`
+- `MONITOR_DOCKER_DIR`
+  默认：`$HOME/.wp-monitor/docker`
 
 ## 环境变量
 
@@ -167,6 +198,13 @@ wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warp
 - `WPLABS_LSP_MANIFEST_URL`
   默认：`https://raw.githubusercontent.com/wp-labs/wplabs-lsp/main/dist/install-manifest.json`
 
+### Monitor Docker
+
+- `MONITOR_DOCKER_BASE_URL`
+  默认：`https://raw.githubusercontent.com/wp-labs/wp-monitor`
+- `MONITOR_DOCKER_DIR`
+  默认：`$HOME/.wp-monitor/docker`
+
 示例：
 
 ```bash
@@ -175,6 +213,7 @@ WP_INST_INSTALL_DIR=/usr/local/bin ./inst-x.sh
 WP_SKILLS_VERSION=v1.0.0 ./inst-x.sh wp-skills
 WP_SKILLS_PATH=skills/warpparse-log-engineering ./inst-x.sh wp-skills
 WPLABS_LSP_VERSION=0.1.1 ./inst-x.sh wplabs-lsp
+MONITOR_DOCKER_DIR=/srv/monitor ./inst-x.sh monitor-docker alpha
 ```
 
 ## 脚本行为
