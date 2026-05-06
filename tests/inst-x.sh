@@ -149,15 +149,6 @@ skill_description() {
     esac
 }
 
-read_user_input() {
-    if tty >/dev/null 2>&1 && [ -r /dev/tty ]; then
-        IFS= read -r "$1" </dev/tty
-        return $?
-    fi
-
-    IFS= read -r "$1"
-}
-
 install_wp_skills() {
     need_optional_cmd tar
     need_optional_cmd find
@@ -197,10 +188,7 @@ install_wp_skills() {
     fi
 
     printf '[wp-skills] 请输入要安装的 skill 编号，多个编号用空格分隔: '
-    if ! read_user_input selections; then
-        echo "[wp-skills] failed to read selection; please run from an interactive terminal" >&2
-        exit 1
-    fi
+    IFS= read -r selections
     if [ -z "$selections" ]; then
         echo "[wp-skills] no skill selected" >&2
         exit 1

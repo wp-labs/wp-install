@@ -131,6 +131,8 @@ $ ./inst-x.sh wp-skills main
 [wp-skills] 请输入要安装的 skill 编号，多个编号用空格分隔: 1 2
 ```
 
+通过 `curl ... | bash -s -- wp-skills <ref>` 运行时，选择输入会优先从当前终端读取，因此也可以正常交互。
+
 可用环境变量：
 
 - `WP_SKILLS_REPO`
