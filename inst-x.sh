@@ -389,28 +389,34 @@ if [ "$TARGET" = "monitor-docker" ]; then
     COMPOSE_FILE="docker-compose-${CHANNEL}.yml"
     START_SCRIPT_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/start.sh"
     COMPOSE_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/${COMPOSE_FILE}"
+    APP_TOML_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/wp-monitor/config/app.toml"
 
     printf '[wp-inst] monitor-docker 安装步骤 (%s channel, %s branch):\n' "$CHANNEL" "$BRANCH"
-    printf '  [1/4] 下载 start.sh\n'
-    printf '  [2/4] 下载 %s\n' "$COMPOSE_FILE"
-    printf '  [3/4] 下载 .env.example\n'
-    printf '  [4/4] 运行 start.sh\n'
+    printf '  [1/5] 下载 start.sh\n'
+    printf '  [2/5] 下载 %s\n' "$COMPOSE_FILE"
+    printf '  [3/5] 下载 .env.example\n'
+    printf '  [4/5] 下载 wp-monitor/config/app.toml\n'
+    printf '  [5/5] 运行 start.sh\n'
     printf '\n'
 
     mkdir -p "$MONITOR_DOCKER_DIR"
+    mkdir -p "$MONITOR_DOCKER_DIR/wp-monitor/config"
 
-    printf '[wp-inst] [1/4] 下载 start.sh\n'
+    printf '[wp-inst] [1/5] 下载 start.sh\n'
     curl -fL "$START_SCRIPT_URL" -o "$MONITOR_DOCKER_DIR/start.sh"
 
-    printf '[wp-inst] [2/4] 下载 %s\n' "$COMPOSE_FILE"
+    printf '[wp-inst] [2/5] 下载 %s\n' "$COMPOSE_FILE"
     curl -fL "$COMPOSE_URL" -o "$MONITOR_DOCKER_DIR/$COMPOSE_FILE"
 
-    printf '[wp-inst] [3/4] 下载 .env.example\n'
+    printf '[wp-inst] [3/5] 下载 .env.example\n'
     curl -fL "${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/.env.example" -o "$MONITOR_DOCKER_DIR/.env.example"
+
+    printf '[wp-inst] [4/5] 下载 wp-monitor/config/app.toml\n'
+    curl -fL "$APP_TOML_URL" -o "$MONITOR_DOCKER_DIR/wp-monitor/config/app.toml"
 
     chmod +x "$MONITOR_DOCKER_DIR/start.sh"
 
-    printf '[wp-inst] [4/4] 运行: %s/start.sh\n' "$MONITOR_DOCKER_DIR"
+    printf '[wp-inst] [5/5] 运行: %s/start.sh\n' "$MONITOR_DOCKER_DIR"
     (
         cd "$MONITOR_DOCKER_DIR"
         sh start.sh "$CHANNEL"

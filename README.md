@@ -167,6 +167,7 @@ $ ./inst-x.sh wp-skills main
 - `start.sh`
 - `docker-compose-{channel}.yml`
 - `.env.example`
+- `wp-monitor/config/app.toml`
 
 然后执行 `start.sh`（传入 channel 参数），启动容器监控栈。
 

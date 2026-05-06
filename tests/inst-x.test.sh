@@ -208,7 +208,7 @@ mock_setup; set +e
 MDIR="$HOME/.wp-monitor/docker"
 "$INST_X" monitor-docker alpha >/dev/null 2>&1; set -e
 all_ok=1
-for f in start.sh docker-compose-alpha.yml .env.example; do
+for f in start.sh docker-compose-alpha.yml .env.example wp-monitor/config/app.toml; do
     [ -f "$MDIR/$f" ] || all_ok=0
 done
 [ -x "$MDIR/start.sh" ] || all_ok=0
