@@ -164,14 +164,19 @@ $ ./inst-x.sh wp-skills main
 
 ## `monitor-docker`
 
-`monitor-docker` 目标会从 `wp-labs/wp-monitor` 仓库下载以下文件到 `$HOME/.wp-monitor/docker/`：
+`monitor-docker` 目标会下载 `wp-labs/wp-monitor` 仓库对应分支中的 `install/docker/` 目录，复制到当前目录下并命名为 `wp-monitor/`（或使用 `MONITOR_DOCKER_DIR` 指定目录）。
 
-- `start.sh`
-- `docker-compose-{channel}.yml`
-- `.env.example`
-- `wp-monitor/config/app.toml`
+复制完成后，会进入该目录执行：
 
-然后执行 `start.sh`（传入 channel 参数），启动容器监控栈。
+```bash
+./start.sh <channel>
+```
+
+例如 `alpha` channel 会执行：
+
+```bash
+./start.sh alpha
+```
 
 channel 到分支的映射：
 
@@ -184,7 +189,7 @@ channel 到分支的映射：
 - `MONITOR_DOCKER_BASE_URL`
   默认：`https://raw.githubusercontent.com/wp-labs/wp-monitor`
 - `MONITOR_DOCKER_DIR`
-  默认：`$HOME/.wp-monitor/docker`
+  默认：当前目录下的 `wp-monitor/`
 
 ## 环境变量
 
@@ -227,7 +232,7 @@ channel 到分支的映射：
 - `MONITOR_DOCKER_BASE_URL`
   默认：`https://raw.githubusercontent.com/wp-labs/wp-monitor`
 - `MONITOR_DOCKER_DIR`
-  默认：`$HOME/.wp-monitor/docker`
+  默认：当前目录下的 `wp-monitor/`
 
 示例：
 

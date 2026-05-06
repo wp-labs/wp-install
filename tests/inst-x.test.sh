@@ -29,28 +29,53 @@ MOCK
     MOCK_WP_SKILLS_ARCHIVE="$TESTDIR/wp-skills-main.tar.gz"
     tar -czf "$MOCK_WP_SKILLS_ARCHIVE" -C "$TESTDIR" "wp-skills-main"
 
+    MONITOR_REPO_DIR="$TESTDIR/wp-monitor-alpha"
+    mkdir -p "$MONITOR_REPO_DIR/install/docker/config"
+    cat > "$MONITOR_REPO_DIR/install/docker/start.sh" <<'MOCK'
+#!/bin/sh
+echo "start.sh OK: channel=$1"
+MOCK
+    chmod +x "$MONITOR_REPO_DIR/install/docker/start.sh"
+    printf 'compose\n' > "$MONITOR_REPO_DIR/install/docker/docker-compose-alpha.yml"
+    printf 'compose\n' > "$MONITOR_REPO_DIR/install/docker/docker-compose-beta.yml"
+    printf 'compose\n' > "$MONITOR_REPO_DIR/install/docker/docker-compose-main.yml"
+    printf 'env\n' > "$MONITOR_REPO_DIR/install/docker/.env.example"
+    printf 'app\n' > "$MONITOR_REPO_DIR/install/docker/config/app.toml"
+    MOCK_WP_MONITOR_ARCHIVE="$TESTDIR/wp-monitor-alpha.tar.gz"
+    tar -czf "$MOCK_WP_MONITOR_ARCHIVE" -C "$TESTDIR" "wp-monitor-alpha"
+
     cat > "$MOCKDIR/curl" <<'MOCK'
 #!/bin/sh
 echo "[MOCK curl] $*" >> "$MOCK_TRACE"
 for arg in "$@"; do
     case "$arg" in */releases/latest) echo "https://github.com/wp-labs/wp-update/releases/tag/v9.9.9"; exit 0 ;; esac
 done
-next=0
-for arg in "$@"; do
-    if [ "$next" = "1" ]; then
-        case "$arg" in
-            *.tar.gz) cp "$MOCK_WP_SKILLS_ARCHIVE" "$arg" ;;
-            *start.sh) printf '#!/bin/sh\necho "start.sh OK: channel=$1"\n' > "$arg" ;;
+    url=""
+    out=""
+    prev=""
+    for arg in "$@"; do
+        if [ -z "$url" ] && [ "${arg#http}" != "$arg" ]; then
+            url="$arg"
+        fi
+        if [ "$prev" = "-o" ]; then
+            out="$arg"
+            break
+        fi
+        prev="$arg"
+    done
+    if [ -n "$out" ]; then
+        case "$url" in
+            *wp-skills*archive*tar.gz) cp "$MOCK_WP_SKILLS_ARCHIVE" "$out" ;;
+            *wp-monitor*archive*tar.gz) cp "$MOCK_WP_MONITOR_ARCHIVE" "$out" ;;
+            *start.sh) printf '#!/bin/sh\necho "start.sh OK: channel=$1"\n' > "$out" ;;
             *)
-                printf '#!/bin/sh\ncase "$1" in -V) echo "wp-inst vtesting" ;; install) echo "mock-install: $*" ;; --skill) echo "mock-skill: $*" ;; esac\n' > "$arg"
-                chmod +x "$arg"
+                printf '#!/bin/sh\ncase "$1" in -V) echo "wp-inst vtesting" ;; install) echo "mock-install: $*" ;; --skill) echo "mock-skill: $*" ;; esac\n' > "$out"
+                chmod +x "$out"
                 ;;
         esac
         exit 0
     fi
-    if [ "$arg" = "-o" ]; then next=1; fi
-done
-exit 0
+    exit 0
 MOCK
     chmod +x "$MOCKDIR/curl"
 
@@ -68,6 +93,7 @@ MOCK
     export MOCK_TRACE="$TESTDIR/trace.txt"
     > "$MOCK_TRACE"
     export MOCK_WP_SKILLS_ARCHIVE
+    export MOCK_WP_MONITOR_ARCHIVE
     export MOCK_UNAME_S="Linux"
     export MOCK_UNAME_M="x86_64"
     export WP_INST_INSTALL_DIR="$TESTDIR/install"
@@ -205,14 +231,20 @@ mock_teardown
 echo "=== monitor-docker"
 
 mock_setup; set +e
-MDIR="$HOME/.wp-monitor/docker"
-"$INST_X" monitor-docker alpha >/dev/null 2>&1; set -e
+RUN_DIR="$TESTDIR/run"
+mkdir -p "$RUN_DIR"
+MDIR="$RUN_DIR/wp-monitor"
+(
+    cd "$RUN_DIR"
+    "$INST_X" monitor-docker alpha >/dev/null 2>&1
+)
+set -e
 all_ok=1
-for f in start.sh docker-compose-alpha.yml .env.example wp-monitor/config/app.toml; do
+for f in start.sh docker-compose-alpha.yml .env.example config/app.toml; do
     [ -f "$MDIR/$f" ] || all_ok=0
 done
 [ -x "$MDIR/start.sh" ] || all_ok=0
-if [ "$all_ok" = "1" ]; then
+if [ "$all_ok" = "1" ] && grep -q "wp-monitor/archive/refs/heads/alpha.tar.gz" "$MOCK_TRACE"; then
     pass "monitor-docker alpha downloads all files"
 else
     fail "monitor-docker alpha downloads all files"

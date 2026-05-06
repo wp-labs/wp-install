@@ -11,7 +11,7 @@ WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubuserconte
 GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
 GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
 MONITOR_DOCKER_BASE_URL="${MONITOR_DOCKER_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-monitor}"
-MONITOR_DOCKER_DIR="${MONITOR_DOCKER_DIR:-$HOME/.wp-monitor/docker}"
+MONITOR_DOCKER_DIR="${MONITOR_DOCKER_DIR:-$PWD/wp-monitor}"
 TARGET="${1:-}"
 ARG2="${2:-}"
 CHANNEL="${ARG2:-}"
@@ -33,6 +33,23 @@ need_optional_cmd() {
         echo "[wp-inst] missing required command: $1" >&2
         exit 1
     fi
+}
+
+resolve_monitor_docker_repo() {
+    repo_path="${MONITOR_DOCKER_BASE_URL#https://raw.githubusercontent.com/}"
+    repo_path="${repo_path#http://raw.githubusercontent.com/}"
+
+    old_ifs=$IFS
+    IFS='/'
+    set -- $repo_path
+    IFS=$old_ifs
+
+    if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+        echo "[wp-inst] failed to resolve monitor-docker repo from $MONITOR_DOCKER_BASE_URL" >&2
+        exit 1
+    fi
+
+    printf '%s/%s\n' "$1" "$2"
 }
 
 usage() {
@@ -395,47 +412,54 @@ if [ "$TARGET" = "wplabs-lsp" ]; then
 fi
 
 if [ "$TARGET" = "monitor-docker" ]; then
+    need_optional_cmd tar
+    need_optional_cmd cp
+    need_optional_cmd find
+    need_optional_cmd head
+
     case "$CHANNEL" in
         alpha) BRANCH="alpha" ;;
         beta)  BRANCH="beta" ;;
         stable) BRANCH="main" ;;
     esac
-    COMPOSE_FILE="docker-compose-${CHANNEL}.yml"
-    START_SCRIPT_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/start.sh"
-    COMPOSE_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/${COMPOSE_FILE}"
-    APP_TOML_URL="${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/wp-monitor/config/app.toml"
+    MONITOR_DOCKER_REPO=$(resolve_monitor_docker_repo)
+    ARCHIVE_DIR=$(mktemp -d)
+    ARCHIVE_PATH="$ARCHIVE_DIR/wp-monitor.tar.gz"
+    ARCHIVE_URL="https://github.com/${MONITOR_DOCKER_REPO}/archive/refs/heads/${BRANCH}.tar.gz"
+    cleanup_monitor_docker() {
+        rm -rf "$ARCHIVE_DIR"
+    }
+    trap cleanup_monitor_docker EXIT INT TERM
 
     printf '[wp-inst] monitor-docker 安装步骤 (%s channel, %s branch):\n' "$CHANNEL" "$BRANCH"
-    printf '  [1/5] 下载 start.sh\n'
-    printf '  [2/5] 下载 %s\n' "$COMPOSE_FILE"
-    printf '  [3/5] 下载 .env.example\n'
-    printf '  [4/5] 下载 wp-monitor/config/app.toml\n'
-    printf '  [5/5] 运行 start.sh\n'
+    printf '  [1/3] 下载仓库归档\n'
+    printf '  [2/3] 解压 install/docker 到 %s\n' "$MONITOR_DOCKER_DIR"
+    printf '  [3/3] 运行 ./start.sh %s\n' "$CHANNEL"
     printf '\n'
 
+    printf '[wp-inst] [1/3] 下载 %s\n' "$ARCHIVE_URL"
+    curl -fL "$ARCHIVE_URL" -o "$ARCHIVE_PATH"
+
+    tar -xzf "$ARCHIVE_PATH" -C "$ARCHIVE_DIR"
+    EXTRACTED_REPO_DIR=$(find "$ARCHIVE_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+    SOURCE_DOCKER_DIR="$EXTRACTED_REPO_DIR/install/docker"
+    if [ ! -d "$SOURCE_DOCKER_DIR" ]; then
+        echo "[wp-inst] extracted archive does not contain install/docker" >&2
+        exit 1
+    fi
+
+    printf '[wp-inst] [2/3] 解压 install/docker 到 %s\n' "$MONITOR_DOCKER_DIR"
     mkdir -p "$MONITOR_DOCKER_DIR"
-    mkdir -p "$MONITOR_DOCKER_DIR/wp-monitor/config"
-
-    printf '[wp-inst] [1/5] 下载 start.sh\n'
-    curl -fL "$START_SCRIPT_URL" -o "$MONITOR_DOCKER_DIR/start.sh"
-
-    printf '[wp-inst] [2/5] 下载 %s\n' "$COMPOSE_FILE"
-    curl -fL "$COMPOSE_URL" -o "$MONITOR_DOCKER_DIR/$COMPOSE_FILE"
-
-    printf '[wp-inst] [3/5] 下载 .env.example\n'
-    curl -fL "${MONITOR_DOCKER_BASE_URL}/${BRANCH}/install/docker/.env.example" -o "$MONITOR_DOCKER_DIR/.env.example"
-
-    printf '[wp-inst] [4/5] 下载 wp-monitor/config/app.toml\n'
-    curl -fL "$APP_TOML_URL" -o "$MONITOR_DOCKER_DIR/wp-monitor/config/app.toml"
+    cp -R "$SOURCE_DOCKER_DIR"/. "$MONITOR_DOCKER_DIR"/
 
     chmod +x "$MONITOR_DOCKER_DIR/start.sh"
 
-    printf '[wp-inst] [5/5] 运行: %s/start.sh\n' "$MONITOR_DOCKER_DIR"
+    printf '[wp-inst] [3/3] 运行: %s/start.sh %s\n' "$MONITOR_DOCKER_DIR" "$CHANNEL"
     (
         cd "$MONITOR_DOCKER_DIR"
-        sh start.sh "$CHANNEL"
+        ./start.sh "$CHANNEL" -f
     )
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n  MONITOR_DOCKER_DIR=$HOME/.wp-monitor/docker\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n'
