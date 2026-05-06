@@ -150,9 +150,11 @@ skill_description() {
 }
 
 read_user_input() {
-    if tty >/dev/null 2>&1 && [ -r /dev/tty ]; then
-        IFS= read -r "$1" </dev/tty
-        return $?
+    if exec 3</dev/tty 2>/dev/null; then
+        IFS= read -r "$1" <&3
+        rc=$?
+        exec 3<&-
+        return $rc
     fi
 
     IFS= read -r "$1"
