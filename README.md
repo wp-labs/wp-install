@@ -28,7 +28,7 @@ $HOME/bin/wp-inst
 ## 用法
 
 ```bash
-./inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills | wplabs-lsp]
+./inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills [branch-or-tag] | wplabs-lsp]
 ```
 
 支持的目标：
@@ -38,7 +38,7 @@ $HOME/bin/wp-inst
 - `gx`：安装 `wp-inst` 后，再安装 GX manifest 制品
 - `gops`：安装 `wp-inst` 后，再安装 GOPS manifest 制品
 - `wpl-check`：安装 `wp-inst` 后，再安装 `wpl-check`
-- `wp-skills`：安装 `wp-inst` 后，再安装 `wp-skills` 中的一个 skill
+- `wp-skills`：下载 `wp-skills` 仓库归档，列出可用 skill，并按你的选择安装
 - `wplabs-lsp`：安装 `wp-inst` 后，再调用本仓库的 `lsp_setup.sh` 安装 `wplabs-lsp`
 - `monitor-docker`：从 `wp-labs/wp-monitor` 下载 `start.sh`、`docker-compose` 和 `.env.example`，然后运行 `start.sh` 启动容器监控栈
 
@@ -82,10 +82,17 @@ $HOME/bin/wp-inst
 ./inst-x.sh wpl-check
 ```
 
-安装默认 skill：
+安装 `wp-skills`（默认从 `main` 分支拉取，并交互选择 skill）：
 
 ```bash
 ./inst-x.sh wp-skills
+```
+
+安装指定分支或 tag 的 `wp-skills`：
+
+```bash
+./inst-x.sh wp-skills main
+./inst-x.sh wp-skills v1.0.0
 ```
 
 安装 `wplabs-lsp`：
@@ -102,18 +109,34 @@ $HOME/bin/wp-inst
 
 ## `wp-skills`
 
-`wp-skills` 目标默认会执行：
+`wp-skills` 目标会执行以下流程：
 
-```bash
-wp-inst --skill --github https://github.com/wp-labs/wp-skills --path skills/warpparse-log-engineering
+1. 从 `wp-labs/wp-skills` 下载指定分支或 tag 的归档，默认 `main`
+2. 解压后扫描 `skills/` 目录
+3. 列出可用 skill，并提示你输入编号
+4. 支持一次选择多个 skill，多个编号使用空格分隔
+5. 对每个选中的 skill，调用归档里的 `install-skill.sh` 安装到本地 skill 目录
+
+典型目录和用途：
+
+- `skills/wp-deploy`：`wparse` 用于部署和配置的 skill
+- `skills/wpl-rule-check`：编写 `WPL` 和 `OML` 的 skill
+
+示例交互：
+
+```text
+$ ./inst-x.sh wp-skills main
+  1) wp-deploy - wparse 用于部署和配置的 skill
+  2) wpl-rule-check - 编写 WPL 和 OML 的 skill
+[wp-skills] 请输入要安装的 skill 编号，多个编号用空格分隔: 1 2
 ```
 
-也就是默认安装：
+可用环境变量：
 
-- 仓库：`wp-labs/wp-skills`
-- skill 路径：`skills/warpparse-log-engineering`
-
-你可以用环境变量改成其他仓库、路径或版本。
+- `WP_SKILLS_REPO`
+  默认：`wp-labs/wp-skills`
+- `WP_SKILLS_REF`
+  默认：`main`
 
 ## `wplabs-lsp`
 
@@ -184,10 +207,8 @@ channel 到分支的映射：
 
 - `WP_SKILLS_REPO`
   默认：`wp-labs/wp-skills`
-- `WP_SKILLS_PATH`
-  默认：`skills/warpparse-log-engineering`
-- `WP_SKILLS_VERSION`
-  默认：`latest`
+- `WP_SKILLS_REF`
+  默认：`main`
 
 ### LSP
 
@@ -210,8 +231,8 @@ channel 到分支的映射：
 ```bash
 WP_INST_VERSION=v0.1.9 ./inst-x.sh
 WP_INST_INSTALL_DIR=/usr/local/bin ./inst-x.sh
-WP_SKILLS_VERSION=v1.0.0 ./inst-x.sh wp-skills
-WP_SKILLS_PATH=skills/warpparse-log-engineering ./inst-x.sh wp-skills
+WP_SKILLS_REF=v1.0.0 ./inst-x.sh wp-skills
+WP_SKILLS_REPO=wp-labs/wp-skills ./inst-x.sh wp-skills
 WPLABS_LSP_VERSION=0.1.1 ./inst-x.sh wplabs-lsp
 MONITOR_DOCKER_DIR=/srv/monitor ./inst-x.sh monitor-docker alpha
 ```

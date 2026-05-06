@@ -13,6 +13,22 @@ mock_setup() {
     MOCKDIR="$TESTDIR/mocks"
     mkdir -p "$MOCKDIR"
 
+    SKILL_REPO_DIR="$TESTDIR/wp-skills-main"
+    mkdir -p "$SKILL_REPO_DIR/skills/wp-deploy" "$SKILL_REPO_DIR/skills/wpl-rule-check"
+    cat > "$SKILL_REPO_DIR/install-skill.sh" <<'MOCK'
+#!/usr/bin/env bash
+set -eu
+skill_name="$1"
+target_dir="${HOME}/.claude/skills/${skill_name}"
+mkdir -p "$target_dir"
+printf '%s\n' "$skill_name" > "$target_dir/installed.txt"
+MOCK
+    chmod +x "$SKILL_REPO_DIR/install-skill.sh"
+    printf 'wp-deploy\n' > "$SKILL_REPO_DIR/skills/wp-deploy/SKILL.md"
+    printf 'wpl-rule-check\n' > "$SKILL_REPO_DIR/skills/wpl-rule-check/SKILL.md"
+    MOCK_WP_SKILLS_ARCHIVE="$TESTDIR/wp-skills-main.tar.gz"
+    tar -czf "$MOCK_WP_SKILLS_ARCHIVE" -C "$TESTDIR" "wp-skills-main"
+
     cat > "$MOCKDIR/curl" <<'MOCK'
 #!/bin/sh
 echo "[MOCK curl] $*" >> "$MOCK_TRACE"
@@ -23,6 +39,7 @@ next=0
 for arg in "$@"; do
     if [ "$next" = "1" ]; then
         case "$arg" in
+            *.tar.gz) cp "$MOCK_WP_SKILLS_ARCHIVE" "$arg" ;;
             *start.sh) printf '#!/bin/sh\necho "start.sh OK: channel=$1"\n' > "$arg" ;;
             *)
                 printf '#!/bin/sh\ncase "$1" in -V) echo "wp-inst vtesting" ;; install) echo "mock-install: $*" ;; --skill) echo "mock-skill: $*" ;; esac\n' > "$arg"
@@ -50,6 +67,7 @@ MOCK
     export PATH="$MOCKDIR:$PATH"
     export MOCK_TRACE="$TESTDIR/trace.txt"
     > "$MOCK_TRACE"
+    export MOCK_WP_SKILLS_ARCHIVE
     export MOCK_UNAME_S="Linux"
     export MOCK_UNAME_M="x86_64"
     export WP_INST_INSTALL_DIR="$TESTDIR/install"
@@ -79,6 +97,18 @@ if [ "$rc" -eq 0 ] && echo "$_output" | grep -q "Usage"; then
 else
     fail "prints usage with --help"
 fi
+
+mock_setup; set +e
+_output=$("$INST_X" wp-skills -h 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] && echo "$_output" | grep -q "Usage: inst-x.sh wp-skills \[ref\]" && ! grep -q "archive/refs" "$MOCK_TRACE" 2>/dev/null; then
+    pass "prints wp-skills help with -h"
+else
+    fail "prints wp-skills help with -h"
+fi
+mock_teardown
+
+set +e
 
 _output=$("$INST_X" invalid-target 2>&1); rc=$?
 if [ "$rc" -eq 1 ] && echo "$_output" | grep -q "unsupported target"; then
@@ -125,11 +155,49 @@ fi
 mock_teardown
 
 mock_setup; set +e
+printf '1\n' | "$INST_X" wp-skills >/dev/null 2>&1; set -e
+if ! grep -q "releases/download" "$MOCK_TRACE" 2>/dev/null; then
+    pass "wp-skills skips wp-inst download"
+else
+    fail "wp-skills skips wp-inst download"
+fi
+mock_teardown
+
+mock_setup; set +e
 "$INST_X" wparse >/dev/null 2>&1; set -e
 if grep -q "releases/download" "$MOCK_TRACE" 2>/dev/null; then
     pass "wparse triggers wp-inst download"
 else
     fail "wparse triggers wp-inst download"
+fi
+mock_teardown
+
+# ============================================================
+echo "=== wp-skills"
+
+mock_setup; set +e
+_output=$(printf '1\n' | "$INST_X" wp-skills 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] \
+    && echo "$_output" | grep -q "downloading ref main" \
+    && echo "$_output" | grep -q "1) wp-deploy" \
+    && [ -f "$HOME/.claude/skills/wp-deploy/installed.txt" ]; then
+    pass "wp-skills defaults to main and installs selected skill"
+else
+    fail "wp-skills defaults to main and installs selected skill"
+fi
+mock_teardown
+
+mock_setup; set +e
+_output=$(printf '1 2\n' | "$INST_X" wp-skills release-1 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] \
+    && grep -q "archive/refs/heads/release-1.tar.gz" "$MOCK_TRACE" \
+    && [ -f "$HOME/.claude/skills/wp-deploy/installed.txt" ] \
+    && [ -f "$HOME/.claude/skills/wpl-rule-check/installed.txt" ]; then
+    pass "wp-skills supports custom ref and multiple selections"
+else
+    fail "wp-skills supports custom ref and multiple selections"
 fi
 mock_teardown
 
