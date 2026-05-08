@@ -181,7 +181,7 @@ fi
 mock_teardown
 
 mock_setup; set +e
-printf '1\n' | "$INST_X" wp-skills >/dev/null 2>&1; set -e
+"$INST_X" wp-skills >/dev/null 2>&1; set -e
 if ! grep -q "releases/download" "$MOCK_TRACE" 2>/dev/null; then
     pass "wp-skills skips wp-inst download"
 else
@@ -202,28 +202,31 @@ mock_teardown
 echo "=== wp-skills"
 
 mock_setup; set +e
-_output=$(printf '1\n' | "$INST_X" wp-skills 2>&1); rc=$?
+_output=$("$INST_X" wp-skills 2>&1); rc=$?
 set -e
 if [ "$rc" -eq 0 ] \
     && echo "$_output" | grep -q "downloading ref main" \
-    && echo "$_output" | grep -q "1) wp-deploy" \
-    && [ -f "$HOME/.claude/skills/wp-deploy/installed.txt" ]; then
-    pass "wp-skills defaults to main and installs selected skill"
+    && echo "$_output" | grep -q "installing all detected skills" \
+    && echo "$_output" | grep -q "install success" \
+    && echo "$_output" | grep -q "$HOME/.claude/skills" \
+    && [ -f "$HOME/.claude/skills/wp-deploy/installed.txt" ] \
+    && [ -f "$HOME/.claude/skills/wpl-rule-check/installed.txt" ]; then
+    pass "wp-skills defaults to main and installs all skills"
 else
-    fail "wp-skills defaults to main and installs selected skill"
+    fail "wp-skills defaults to main and installs all skills"
 fi
 mock_teardown
 
 mock_setup; set +e
-_output=$(printf '1 2\n' | "$INST_X" wp-skills release-1 2>&1); rc=$?
+_output=$("$INST_X" wp-skills release-1 2>&1); rc=$?
 set -e
 if [ "$rc" -eq 0 ] \
     && grep -q "archive/refs/heads/release-1.tar.gz" "$MOCK_TRACE" \
     && [ -f "$HOME/.claude/skills/wp-deploy/installed.txt" ] \
     && [ -f "$HOME/.claude/skills/wpl-rule-check/installed.txt" ]; then
-    pass "wp-skills supports custom ref and multiple selections"
+    pass "wp-skills supports custom ref and installs all skills"
 else
-    fail "wp-skills supports custom ref and multiple selections"
+    fail "wp-skills supports custom ref and installs all skills"
 fi
 mock_teardown
 

@@ -158,25 +158,6 @@ download_wp_skills_archive() {
     exit 1
 }
 
-skill_description() {
-    case "$1" in
-        wp-deploy) printf 'wparse 用于部署和配置的 skill\n' ;;
-        wpl-rule-check) printf '编写 WPL 和 OML 的 skill\n' ;;
-        *) printf 'skill\n' ;;
-    esac
-}
-
-read_user_input() {
-    if exec 3</dev/tty 2>/dev/null; then
-        IFS= read -r "$1" <&3
-        rc=$?
-        exec 3<&-
-        return $rc
-    fi
-
-    IFS= read -r "$1"
-}
-
 install_wp_skills() {
     need_optional_cmd tar
     need_optional_cmd find
@@ -199,14 +180,12 @@ install_wp_skills() {
         exit 1
     fi
 
-    skill_names=""
     skill_count=0
     for skill_dir in "$repo_dir"/skills/*; do
         if [ -d "$skill_dir" ]; then
             skill_count=$((skill_count + 1))
             skill_name=${skill_dir##*/}
-            skill_names="$skill_names $skill_name"
-            printf '  %s) %s - %s\n' "$skill_count" "$skill_name" "$(skill_description "$skill_name")"
+            printf '[wp-skills] detected skill: %s\n' "$skill_name"
         fi
     done
 
@@ -215,52 +194,61 @@ install_wp_skills() {
         exit 1
     fi
 
-    printf '[wp-skills] 请输入要安装的 skill 编号，多个编号用空格分隔: '
-    if ! read_user_input selections; then
-        echo "[wp-skills] failed to read selection; please run from an interactive terminal" >&2
-        exit 1
-    fi
-    if [ -z "$selections" ]; then
-        echo "[wp-skills] no skill selected" >&2
-        exit 1
-    fi
-
-    selected_skills=""
-    for token in $selections; do
-        case "$token" in
-            *[!0-9]*|'')
-                echo "[wp-skills] invalid selection: $token" >&2
-                exit 1
-                ;;
-        esac
-
-        idx=1
-        chosen_skill=""
-        for skill_name in $skill_names; do
-            if [ "$idx" = "$token" ]; then
-                chosen_skill="$skill_name"
-                break
-            fi
-            idx=$((idx + 1))
-        done
-
-        if [ -z "$chosen_skill" ]; then
-            echo "[wp-skills] selection out of range: $token" >&2
-            exit 1
+    printf '[wp-skills] installing all detected skills\n'
+    for skill_dir in "$repo_dir"/skills/*; do
+        if [ ! -d "$skill_dir" ]; then
+            continue
         fi
-
-        case " $selected_skills " in
-            *" $chosen_skill "*) ;;
-            *) selected_skills="$selected_skills $chosen_skill" ;;
-        esac
-    done
-
-    for skill_name in $selected_skills; do
+        skill_name=${skill_dir##*/}
         printf '[wp-skills] installing %s from ref %s\n' "$skill_name" "$WP_SKILLS_REF"
         (
             cd "$repo_dir"
             bash ./install-skill.sh "$skill_name"
         )
+    done
+
+    print_wp_skills_install_summary
+}
+
+print_wp_skills_install_summary() {
+    install_dirs=""
+
+    if [ -n "${WP_SKILLS_PLATFORM:-}" ]; then
+        case "$WP_SKILLS_PLATFORM" in
+            codex)
+                install_dirs="$HOME/.codex/skills"
+                ;;
+            claude-code)
+                install_dirs="$HOME/.claude/skills"
+                ;;
+            auto)
+                if [ -d "$HOME/.claude/skills" ]; then
+                    install_dirs="$HOME/.claude/skills"
+                elif [ -d "$HOME/.codex/skills" ]; then
+                    install_dirs="$HOME/.codex/skills"
+                else
+                    install_dirs="$HOME/.claude/skills"
+                fi
+                ;;
+            *)
+                install_dirs="$HOME/.claude/skills"
+                ;;
+        esac
+    else
+        if [ -d "$HOME/.codex/skills" ]; then
+            install_dirs="$install_dirs $HOME/.codex/skills"
+        fi
+        if [ -d "$HOME/.claude/skills" ]; then
+            install_dirs="$install_dirs $HOME/.claude/skills"
+        fi
+        if [ -z "$install_dirs" ]; then
+            install_dirs="$HOME/.claude/skills"
+        fi
+    fi
+
+    echo "[wp-skills] 安装成功"
+    for install_dir in $install_dirs; do
+        printf '[wp-skills] 安装的目录: %s\n' "$install_dir"
     done
 }
 

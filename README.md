@@ -82,7 +82,7 @@ $HOME/bin/wp-inst
 ./inst-x.sh wpl-check
 ```
 
-安装 `wp-skills`（默认从 `main` 分支拉取，并交互选择 skill）：
+安装 `wp-skills`（默认从 `main` 分支拉取，并安装全部 skill）：
 
 ```bash
 ./inst-x.sh wp-skills
@@ -113,25 +113,22 @@ $HOME/bin/wp-inst
 
 1. 从 `wp-labs/wp-skills` 下载指定分支或 tag 的归档，默认 `main`
 2. 解压后扫描 `skills/` 目录
-3. 列出可用 skill，并提示你输入编号
-4. 支持一次选择多个 skill，多个编号使用空格分隔
-5. 对每个选中的 skill，调用归档里的 `install-skill.sh` 安装到本地 skill 目录
+3. 检测归档里的全部 skill
+4. 调用归档里的 `install-skill.sh`，把全部 skill 安装到本地 skill 目录
 
 典型目录和用途：
 
 - `skills/wp-deploy`：`wparse` 用于部署和配置的 skill
 - `skills/wpl-rule-check`：编写 `WPL` 和 `OML` 的 skill
 
-示例交互：
+示例输出：
 
 ```text
 $ ./inst-x.sh wp-skills main
-  1) wp-deploy - wparse 用于部署和配置的 skill
-  2) wpl-rule-check - 编写 WPL 和 OML 的 skill
-[wp-skills] 请输入要安装的 skill 编号，多个编号用空格分隔: 1 2
+[wp-skills] detected skill: wp-deploy
+[wp-skills] detected skill: wpl-rule-check
+[wp-skills] installing all detected skills
 ```
-
-通过 `curl ... | bash -s -- wp-skills <ref>` 运行时，选择输入会优先从当前终端读取，因此也可以正常交互。
 
 可用环境变量：
 
