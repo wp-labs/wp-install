@@ -140,7 +140,7 @@ fi
 tar -xzf "$ARCHIVE_PATH" -C "$TMP_DIR"
 mkdir -p "$INSTALL_DIR"
 
-BINARIES="wparse wpgen wprescue wproj"
+BINARIES="wparse wpgen wprescue wpadm"
 INSTALLED=""
 for bin in $BINARIES; do
     BIN_PATH=$(find "$TMP_DIR" -maxdepth 3 -type f -name "$bin" | head -n 1)
