@@ -10,6 +10,7 @@ WP_SKILLS_REF="${WP_SKILLS_REF:-${2:-main}}"
 WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
 GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
 GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
+WFUSION_UPDATES_BASE_URL="${WFUSION_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/warp-fusion/main/updates}"
 MONITOR_DOCKER_BASE_URL="${MONITOR_DOCKER_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-monitor}"
 MONITOR_DOCKER_DIR="${MONITOR_DOCKER_DIR:-$PWD/wp-monitor}"
 TARGET="${1:-}"
@@ -54,7 +55,7 @@ resolve_monitor_docker_repo() {
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills [ref] | wplabs-lsp]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wfusion [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills [ref] | wplabs-lsp]
 
 Options:
   wparse    After installing wp-inst, run:
@@ -63,6 +64,8 @@ Options:
             wp-inst install --source https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx
   gops      After installing wp-inst, run:
             wp-inst install --source https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops
+  wfusion   After installing wp-inst, run:
+            wp-inst install --source https://raw.githubusercontent.com/wp-labs/warp-fusion/main/updates
   channel   Optional update channel.
             default: stable
   wpl-check After installing wp-inst, run:
@@ -94,7 +97,7 @@ EOF
 }
 
 case "$TARGET" in
-    ""|wparse|gx|gops|wpl-check|wp-skills|wplabs-lsp|monitor-docker) : ;;
+    ""|wparse|gx|gops|wfusion|wpl-check|wp-skills|wplabs-lsp|monitor-docker) : ;;
     -h|--help)
         usage
         exit 0
@@ -119,7 +122,7 @@ if [ "$TARGET" = "wp-skills" ]; then
     esac
 fi
 
-if [ "$TARGET" = "wparse" ] || [ "$TARGET" = "gx" ] || [ "$TARGET" = "gops" ] || [ "$TARGET" = "monitor-docker" ]; then
+if [ "$TARGET" = "wparse" ] || [ "$TARGET" = "gx" ] || [ "$TARGET" = "gops" ] || [ "$TARGET" = "wfusion" ] || [ "$TARGET" = "monitor-docker" ]; then
     case "$CHANNEL" in
         stable|beta|alpha) : ;;
         *)
@@ -313,7 +316,7 @@ esac
 
 NEEDS_WP_INST=""
 case "$TARGET" in
-    ""|wparse|gx|gops|wpl-check) NEEDS_WP_INST="1" ;;
+    ""|wparse|gx|gops|wfusion|wpl-check) NEEDS_WP_INST="1" ;;
 esac
 
 if [ -n "$NEEDS_WP_INST" ]; then
@@ -385,6 +388,11 @@ if [ "$TARGET" = "gops" ]; then
     "$DEST" install --channel "$CHANNEL" --source "$GOPS_UPDATES_BASE_URL" --dir "$INSTALL_DIR" --yes
 fi
 
+if [ "$TARGET" = "wfusion" ]; then
+    printf '[wp-inst] running: %s install --channel %s --source %s --dir %s --yes\n' "$DEST" "$CHANNEL" "$WFUSION_UPDATES_BASE_URL" "$INSTALL_DIR"
+    "$DEST" install --channel "$CHANNEL" --source "$WFUSION_UPDATES_BASE_URL" --dir "$INSTALL_DIR" --yes
+fi
+
 if [ "$TARGET" = "wpl-check" ]; then
     printf '[wp-inst] running: %s install --github %s --yes\n' "$DEST" "https://github.com/wp-labs/wpl-check"
     "$DEST" install --github "https://github.com/wp-labs/wpl-check" --yes
@@ -450,4 +458,4 @@ if [ "$TARGET" = "monitor-docker" ]; then
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WFUSION_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/warp-fusion/main/updates\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n'

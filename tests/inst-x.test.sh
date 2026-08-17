@@ -157,6 +157,13 @@ else
     fail "exits with error for invalid channel (monitor-docker)"
 fi
 
+_output=$("$INST_X" wfusion invalid-channel 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && echo "$_output" | grep -q "unsupported channel"; then
+    pass "exits with error for invalid channel (wfusion)"
+else
+    fail "exits with error for invalid channel (wfusion)"
+fi
+
 set -e
 
 # ============================================================
@@ -195,6 +202,15 @@ if grep -q "releases/download" "$MOCK_TRACE" 2>/dev/null; then
     pass "wparse triggers wp-inst download"
 else
     fail "wparse triggers wp-inst download"
+fi
+mock_teardown
+
+mock_setup; set +e
+"$INST_X" wfusion >/dev/null 2>&1; set -e
+if grep -q "releases/download" "$MOCK_TRACE" 2>/dev/null; then
+    pass "wfusion triggers wp-inst download"
+else
+    fail "wfusion triggers wp-inst download"
 fi
 mock_teardown
 
@@ -269,6 +285,44 @@ if echo "$_output" | grep -q "beta branch"; then
     pass "monitor-docker beta uses beta branch"
 else
     fail "monitor-docker beta uses beta branch"
+fi
+mock_teardown
+
+# ============================================================
+echo "=== wfusion"
+
+mock_setup; set +e
+_output=$("$INST_X" wfusion 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] \
+    && echo "$_output" | grep -q "mock-install" \
+    && echo "$_output" | grep -q "warp-fusion/main/updates" \
+    && echo "$_output" | grep -q -- "--channel stable"; then
+    pass "wfusion defaults to stable via warp-fusion manifest source"
+else
+    fail "wfusion defaults to stable via warp-fusion manifest source"
+fi
+mock_teardown
+
+mock_setup; set +e
+_output=$("$INST_X" wfusion alpha 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] \
+    && echo "$_output" | grep -q "mock-install" \
+    && echo "$_output" | grep -q "warp-fusion/main/updates" \
+    && echo "$_output" | grep -q -- "--channel alpha"; then
+    pass "wfusion alpha installs via warp-fusion manifest source"
+else
+    fail "wfusion alpha installs via warp-fusion manifest source"
+fi
+mock_teardown
+
+mock_setup; set +e
+_output=$("$INST_X" wfusion 2>&1); set -e
+if echo "$_output" | grep -q "WFUSION_UPDATES_BASE_URL"; then
+    pass "wfusion usage mentions WFUSION_UPDATES_BASE_URL"
+else
+    fail "wfusion usage mentions WFUSION_UPDATES_BASE_URL"
 fi
 mock_teardown
 
