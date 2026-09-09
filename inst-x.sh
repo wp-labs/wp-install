@@ -7,6 +7,9 @@ INSTALL_DIR="${WP_INST_INSTALL_DIR:-$HOME/bin}"
 REQUESTED_TAG="${WP_INST_VERSION:-latest}"
 WP_SKILLS_REPO="${WP_SKILLS_REPO:-wp-labs/wp-skills}"
 WP_SKILLS_REF="${WP_SKILLS_REF:-${2:-main}}"
+WF_SKILLS_REPO="${WF_SKILLS_REPO:-wp-labs/wf-skills}"
+WF_SKILLS_REF="${WF_SKILLS_REF:-main}"
+WF_SKILLS_PLATFORM="${WF_SKILLS_PLATFORM:-auto}"
 WPARSE_UPDATES_BASE_URL="${WP_INST_UPDATES_BASE_URL:-https://raw.githubusercontent.com/wp-labs/wp-install/main/updates}"
 GX_UPDATES_BASE_URL="${GX_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx}"
 GOPS_UPDATES_BASE_URL="${GOPS_UPDATES_BASE_URL:-https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops}"
@@ -56,7 +59,7 @@ resolve_monitor_docker_repo() {
 
 usage() {
     cat <<'EOF'
-Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wfusion [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills [ref] | wplabs-lsp]
+Usage: inst-x.sh [wparse [stable|beta|alpha] | gx [stable|beta|alpha] | gops [stable|beta|alpha] | wfusion [stable|beta|alpha] | monitor-docker [stable|beta|alpha] | wpl-check | wp-skills [ref] | wf-skills [ref] | wplabs-lsp]
 
 Options:
   wparse    After installing wp-inst, run:
@@ -75,6 +78,9 @@ Options:
   wp-skills [ref]
             Download wp-skills archive from branch/tag ref (default: main),
             list available skills, and install selected ones interactively
+  wf-skills [ref]
+            Download wf-skills archive from branch/tag ref (default: main),
+            and install all skills (codex/claude auto-detect)
   wplabs-lsp Install wplabs-lsp via lsp_setup.sh
   monitor-docker
              Install wp-monitor docker stack via start.sh
@@ -98,8 +104,25 @@ one or more numeric selections separated by spaces.
 EOF
 }
 
+wf_skills_usage() {
+    cat <<'EOF'
+Usage: inst-x.sh wf-skills [ref]
+
+Download the wf-skills archive from the given branch or tag ref.
+Default ref: main
+
+Examples:
+  ./inst-x.sh wf-skills
+  ./inst-x.sh wf-skills main
+  ./inst-x.sh wf-skills v1.0.0
+
+After extraction, all skills are installed via the repo's install-skill.sh
+(codex/claude auto-detect; see WF_SKILLS_PLATFORM).
+EOF
+}
+
 case "$TARGET" in
-    ""|wparse|gx|gops|wfusion|wpl-check|wp-skills|wplabs-lsp|monitor-docker) : ;;
+    ""|wparse|gx|gops|wfusion|wpl-check|wp-skills|wf-skills|wplabs-lsp|monitor-docker) : ;;
     -h|--help)
         usage
         exit 0
@@ -115,10 +138,14 @@ if [ -z "$CHANNEL" ]; then
     CHANNEL="stable"
 fi
 
-if [ "$TARGET" = "wp-skills" ]; then
+if [ "$TARGET" = "wp-skills" ] || [ "$TARGET" = "wf-skills" ]; then
     case "$ARG2" in
         -h|--help)
-            wp_skills_usage
+            if [ "$TARGET" = "wp-skills" ]; then
+                wp_skills_usage
+            else
+                wf_skills_usage
+            fi
             exit 0
             ;;
     esac
@@ -228,6 +255,59 @@ install_wp_skills() {
     done
 
     print_wp_skills_install_summary
+}
+
+install_wf_skills() {
+    need_optional_cmd tar
+    need_optional_cmd find
+    need_optional_cmd head
+    need_optional_cmd bash
+
+    if [ -n "$ARG2" ] && [ "$ARG2" != "-h" ] && [ "$ARG2" != "--help" ]; then
+        WF_SKILLS_REF="$ARG2"
+    fi
+
+    archive_dir=$(mktemp -d)
+    archive_path="$archive_dir/wf-skills.tar.gz"
+    cleanup_wf_skills() {
+        rm -rf "$archive_dir"
+    }
+    trap cleanup_wf_skills EXIT INT TERM
+
+    printf '[wf-skills] downloading ref %s from %s\n' "$WF_SKILLS_REF" "$WF_SKILLS_REPO"
+    branch_url="https://github.com/${WF_SKILLS_REPO}/archive/refs/heads/${WF_SKILLS_REF}.tar.gz"
+    tag_url="https://github.com/${WF_SKILLS_REPO}/archive/refs/tags/${WF_SKILLS_REF}.tar.gz"
+    if curl -fL "$branch_url" -o "$archive_path"; then
+        printf '[wf-skills] resolved ref type: branch\n'
+    elif curl -fL "$tag_url" -o "$archive_path"; then
+        printf '[wf-skills] resolved ref type: tag\n'
+    else
+        echo "[wf-skills] failed to download ref '$WF_SKILLS_REF' from $WF_SKILLS_REPO" >&2
+        exit 1
+    fi
+
+    tar -xzf "$archive_path" -C "$archive_dir"
+    repo_dir=$(find "$archive_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+    if [ -z "$repo_dir" ] || [ ! -d "$repo_dir/skills" ]; then
+        echo "[wf-skills] extracted archive does not contain a skills directory" >&2
+        exit 1
+    fi
+
+    skill_count=0
+    for skill_dir in "$repo_dir"/skills/*; do
+        if [ ! -d "$skill_dir" ]; then
+            continue
+        fi
+        skill_name=${skill_dir##*/}
+        printf '[wf-skills] installing %s\n' "$skill_name"
+        (
+            cd "$repo_dir"
+            bash ./install-skill.sh "$skill_name"
+        )
+        skill_count=$((skill_count + 1))
+    done
+
+    printf '[wf-skills] 安装成功：%s 个技能（%s@%s）\n' "$skill_count" "$WF_SKILLS_REPO" "$WF_SKILLS_REF"
 }
 
 print_wp_skills_install_summary() {
@@ -419,6 +499,10 @@ if [ "$TARGET" = "wp-skills" ]; then
     install_wp_skills
 fi
 
+if [ "$TARGET" = "wf-skills" ]; then
+    install_wf_skills
+fi
+
 if [ "$TARGET" = "wplabs-lsp" ]; then
     printf '[wp-inst] running: %s/lsp_setup.sh\n' "$SCRIPT_DIR"
     "$SCRIPT_DIR/lsp_setup.sh"
@@ -475,4 +559,4 @@ if [ "$TARGET" = "monitor-docker" ]; then
 fi
 
 printf '\nEnsure %s is on your PATH, e.g.:\n  export PATH="%s":$PATH\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
-printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WFUSION_UPDATES_BRANCH=beta   # wfusion updates 分支（stable=main / beta=beta / alpha=alpha）\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n'
+printf 'Optional env vars:\n  WP_INST_VERSION=v0.1.5\n  WP_INST_INSTALL_DIR=/usr/local/bin\n  WP_INST_REPO=wp-labs/wp-update\n  WP_INST_UPDATES_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-install/main/updates\n  GX_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx\n  GOPS_UPDATES_BASE_URL=https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops\n  WFUSION_UPDATES_BRANCH=beta   # wfusion updates 分支（stable=main / beta=beta / alpha=alpha）\n  WP_SKILLS_REPO=wp-labs/wp-skills\n  WP_SKILLS_REF=main\n  WF_SKILLS_REPO=wp-labs/wf-skills\n  WF_SKILLS_REF=main\n  WF_SKILLS_PLATFORM=auto\n  MONITOR_DOCKER_BASE_URL=https://raw.githubusercontent.com/wp-labs/wp-monitor\n'
