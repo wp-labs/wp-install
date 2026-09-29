@@ -217,9 +217,9 @@ channel 到分支的映射：
 - `WP_INST_UPDATES_BASE_URL`
   默认：`https://raw.githubusercontent.com/wp-labs/wp-install/main/updates`
 - `GX_UPDATES_BASE_URL`
-  默认：`https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gx`
+  默认：`https://raw.githubusercontent.com/galaxio-labs/get/main/updates/gx`
 - `GOPS_UPDATES_BASE_URL`
-  默认：`https://raw.githubusercontent.com/galaxy-sec/get/main/updates/gops`
+  默认：`https://raw.githubusercontent.com/galaxio-labs/get/main/updates/gops`
 - `WFUSION_UPDATES_BASE_URL`
   默认：`https://raw.githubusercontent.com/wp-labs/warp-fusion/main/updates`
 
