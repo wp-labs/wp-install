@@ -1,0 +1,21 @@
+{
+  "version": "exp-v0.25.1-19-alpha",
+  "channel": "alpha",
+  "published_at": "2026-06-10T13:53:52Z",
+  "git_ref": "exp-v0.25.1-19-alpha",
+  "git_commit": "6b158cbe93e60af25f40ab7a865b52589df10908",
+  "assets": {
+    "aarch64-apple-darwin": {
+      "url": "https://github.com/wp-labs/warp-parse-exp/releases/download/exp-v0.25.1-19-alpha/warp-parse-exp-exp-v0.25.1-19-alpha-aarch64-apple-darwin.tar.gz",
+      "sha256": "674857eed5770055f62b943efeb0d62dd76175fee7559de341a0b186b1f2b813"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "url": "https://github.com/wp-labs/warp-parse-exp/releases/download/exp-v0.25.1-19-alpha/warp-parse-exp-exp-v0.25.1-19-alpha-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "01aba0ad34c09cbabd089e01d6207deec7f40f5451b5cedbaccbe8a076accecb"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "url": "https://github.com/wp-labs/warp-parse-exp/releases/download/exp-v0.25.1-19-alpha/warp-parse-exp-exp-v0.25.1-19-alpha-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "53498583b224cdd31d7e4535af46d51ed739f1bfd1a4448f4435feb965ab9168"
+    }
+  }
+}

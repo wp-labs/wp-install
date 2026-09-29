@@ -1,0 +1,21 @@
+{
+  "version": "v0.25.9-alpha",
+  "channel": "alpha",
+  "published_at": "2026-07-31T11:03:39Z",
+  "git_ref": "v0.25.9-alpha",
+  "git_commit": "d76546d533aed1fe6188ba032be082b4d2a25b3c",
+  "assets": {
+    "aarch64-apple-darwin": {
+      "url": "https://github.com/wp-labs/warp-parse/releases/download/v0.25.9-alpha/warp-parse-v0.25.9-alpha-aarch64-apple-darwin.tar.gz",
+      "sha256": "0d31a4ce86feb2ade5e14337da1e60f1f4b2cc1245d25657475f034d5370aa53"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "url": "https://github.com/wp-labs/warp-parse/releases/download/v0.25.9-alpha/warp-parse-v0.25.9-alpha-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "19661328d878588683b608b709fc5bbba195a8e0d52ffa7735d3c835e1d44c0a"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "url": "https://github.com/wp-labs/warp-parse/releases/download/v0.25.9-alpha/warp-parse-v0.25.9-alpha-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "7f19d18808d81596c0908ec6e8b145ed8750e6a53a8fd158ab00dc8115d07f88"
+    }
+  }
+}
