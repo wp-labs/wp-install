@@ -382,7 +382,6 @@ resolve_tag() {
 resolve_target() {
     case "$OS-$ARCH" in
         darwin-arm64) printf 'aarch64-apple-darwin\n' ;;
-        linux-arm64) printf 'aarch64-unknown-linux-gnu\n' ;;
         linux-x86_64) printf 'x86_64-unknown-linux-gnu\n' ;;
         *)
             echo "[wp-inst] unsupported target combination: $OS-$ARCH" >&2
